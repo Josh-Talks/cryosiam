@@ -32,7 +32,8 @@ class DenseSimSiam(nn.Module):
                               no_max_pool=no_max_pool,
                               num_classes=dim,
                               spatial_dims=self.spatial_dims,
-                              act=("relu", {"inplace": False}))
+                              act=("relu", {"inplace": False}),
+                              feed_forward=False)
         if block_type == 'bottleneck':
             expansion = 4
         else:
@@ -45,16 +46,18 @@ class DenseSimSiam(nn.Module):
                                         out_channels=fpn_channels, expansion=expansion, num_layers=decoder_layers)
 
         # build a 3-layer projector
-        prev_dim = self.encoder.fc.weight.shape[1]
+        #prev_dim = self.encoder.fc.weight.shape[1]
+        prev_dim = num_filters[-1] * expansion
         self.global_projector = nn.Sequential(nn.Linear(prev_dim, prev_dim, bias=False),
                                               nn.BatchNorm1d(prev_dim),
                                               nn.ReLU(inplace=False),  # first layer
                                               nn.Linear(prev_dim, prev_dim, bias=False),
                                               nn.BatchNorm1d(prev_dim),
                                               nn.ReLU(inplace=False),  # second layer
-                                              self.encoder.fc,
+                                              nn.Linear(prev_dim, dim, bias=False),
+                                              #self.encoder.fc,
                                               nn.BatchNorm1d(dim, affine=False))  # output layer
-        self.global_projector[6].bias.requires_grad = False  # hack: not use bias as it is followed by BN
+        #self.global_projector[6].bias.requires_grad = False  # hack: not use bias as it is followed by BN
 
         # build a 2-layer predictor
         self.global_predictor = nn.Sequential(nn.Linear(dim, pred_dim, bias=False),

@@ -52,3 +52,4 @@ coverage.xml
 
 experiments/*
 .DS_Store
+.vscode/

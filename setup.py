@@ -24,6 +24,7 @@ setup(
         "mrcfile",
         "numpy",
         "pandas",
+        "pydantic>=1.10,<3",
         "scipy",
         "plotly",
         "PyYAML",

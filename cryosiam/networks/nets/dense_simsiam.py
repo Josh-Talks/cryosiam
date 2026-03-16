@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from typing import Literal, Tuple
 from monai.networks.nets import ResNet
 
 from .fpn_decoder import FPNDecoder
@@ -11,10 +12,24 @@ class DenseSimSiam(nn.Module):
     Build a DenseSimSiam model.
     """
 
-    def __init__(self, block_type='bottleneck', spatial_dims=3, n_input_channels=1,
-                 num_layers=(1, 1, 1, 1), num_filters=(64, 128, 256, 512), no_max_pool=True, fpn_channels=128,
-                 dim=2048, pred_dim=512, dense_dim=32, dense_pred_dim=64, include_levels=False,
-                 add_later_conv=False, decoder_type='fpn', decoder_layers=2):
+    def __init__(
+        self, 
+        block_type: Literal['bottleneck', 'basic']='bottleneck', 
+        spatial_dims:int=3, 
+        n_input_channels:int=1,
+        num_layers: Tuple[int, ...]=(1, 1, 1, 1), 
+        num_filters: Tuple[int, ...]=(64, 128, 256, 512), 
+        no_max_pool: bool=True, 
+        fpn_channels: int=128,
+        dim: int=2048, 
+        pred_dim: int=512, 
+        dense_dim: int=32, 
+        dense_pred_dim: int=64, 
+        include_levels: bool=False,
+        add_later_conv: bool=False, 
+        decoder_type: Literal['fpn', 'bifpn']='fpn', 
+        decoder_layers: int=2
+    ):
         """
         dim: feature dimension (default: 2048)
         pred_dim: hidden dimension of the predictor (default: 512)
@@ -33,7 +48,8 @@ class DenseSimSiam(nn.Module):
                               num_classes=dim,
                               spatial_dims=self.spatial_dims,
                               act=("relu", {"inplace": False}),
-                              feed_forward=False)
+                              feed_forward=False
+                            )
         if block_type == 'bottleneck':
             expansion = 4
         else:

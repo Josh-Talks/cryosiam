@@ -12,6 +12,7 @@ monai
 mrcfile
 numpy
 pandas
+pydantic
 scipy
 plotly
 PyYAML

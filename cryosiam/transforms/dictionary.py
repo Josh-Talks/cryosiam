@@ -2,7 +2,7 @@ import numpy as np
 from monai.config import KeysCollection
 from monai.utils import convert_to_tensor
 from monai.data.meta_obj import get_track_meta
-from typing import Optional, Dict, Hashable, Tuple
+from typing import Optional, Dict, Hashable, Tuple, Sequence, Union
 from monai.config.type_definitions import NdarrayOrTensor
 from monai.transforms.compose import MapTransform, RandomizableTransform
 
@@ -14,7 +14,8 @@ from .array import (
     InvertIntensity,
     RandomLowPassBlur,
     RandomGaussianNoise,
-    RandomHighPassSharpen
+    RandomHighPassSharpen,
+    RandomMaskedViews,
 )
 
 
@@ -25,7 +26,13 @@ class ClipIntensityd(MapTransform):
 
     backend = ClipIntensity.backend
 
-    def __init__(self, keys: KeysCollection, a_min=None, a_max=None, allow_missing_keys: bool = False) -> None:
+    def __init__(
+        self,
+        keys: KeysCollection,
+        a_min=None,
+        a_max=None,
+        allow_missing_keys: bool = False,
+    ) -> None:
         """
         Args:
             keys: keys of the corresponding items to be transformed.
@@ -73,8 +80,13 @@ class ScaleIntensityd(MapTransform):
 
     backend = ClipIntensity.backend
 
-    def __init__(self, keys: KeysCollection, lower_percentage=0.1,
-                 upper_percentage=99.9, allow_missing_keys: bool = False) -> None:
+    def __init__(
+        self,
+        keys: KeysCollection,
+        lower_percentage=0.1,
+        upper_percentage=99.9,
+        allow_missing_keys: bool = False,
+    ) -> None:
         """
         Args:
             keys: keys of the corresponding items to be transformed.
@@ -82,8 +94,9 @@ class ScaleIntensityd(MapTransform):
             allow_missing_keys: don't raise exception if key is missing.
         """
         super().__init__(keys, allow_missing_keys)
-        self.scale = ScaleIntensity(lower_percentage=lower_percentage,
-                                    upper_percentage=upper_percentage)
+        self.scale = ScaleIntensity(
+            lower_percentage=lower_percentage, upper_percentage=upper_percentage
+        )
 
     def __call__(self, data) -> Dict[Hashable, NdarrayOrTensor]:
         d = dict(data)
@@ -123,8 +136,13 @@ class RandomSharpend(RandomizableTransform, MapTransform):
 
     backend = RandomSharpen.backend
 
-    def __init__(self, keys: KeysCollection, sigma: Tuple[float, float], prob: float = 0.1,
-                 allow_missing_keys: bool = False) -> None:
+    def __init__(
+        self,
+        keys: KeysCollection,
+        sigma: Tuple[float, float],
+        prob: float = 0.1,
+        allow_missing_keys: bool = False,
+    ) -> None:
         """
         Args:
             keys: keys of the corresponding items to be transformed.
@@ -138,7 +156,7 @@ class RandomSharpend(RandomizableTransform, MapTransform):
         self.high_pass = RandomSharpen(sigma=sigma, prob=prob)
 
     def set_random_state(
-            self, seed: Optional[int] = None, state: Optional[np.random.RandomState] = None
+        self, seed: Optional[int] = None, state: Optional[np.random.RandomState] = None
     ) -> "RandomSharpend":
         super().set_random_state(seed, state)
         self.high_pass.set_random_state(seed, state)
@@ -166,8 +184,14 @@ class RandomLowPassBlurd(RandomizableTransform, MapTransform):
 
     backend = RandomLowPassBlur.backend
 
-    def __init__(self, keys: KeysCollection, sigma: Tuple[float, float], ignore_zeros: bool = False, prob: float = 0.1,
-                 allow_missing_keys: bool = False) -> None:
+    def __init__(
+        self,
+        keys: KeysCollection,
+        sigma: Tuple[float, float],
+        ignore_zeros: bool = False,
+        prob: float = 0.1,
+        allow_missing_keys: bool = False,
+    ) -> None:
         """
         Args:
             keys: keys of the corresponding items to be transformed.
@@ -179,10 +203,12 @@ class RandomLowPassBlurd(RandomizableTransform, MapTransform):
         """
         MapTransform.__init__(self, keys, allow_missing_keys)
         RandomizableTransform.__init__(self, prob)
-        self.low_pass = RandomLowPassBlur(sigma=sigma, ignore_zeros=ignore_zeros, prob=prob)
+        self.low_pass = RandomLowPassBlur(
+            sigma=sigma, ignore_zeros=ignore_zeros, prob=prob
+        )
 
     def set_random_state(
-            self, seed: Optional[int] = None, state: Optional[np.random.RandomState] = None
+        self, seed: Optional[int] = None, state: Optional[np.random.RandomState] = None
     ) -> "RandomLowPassBlurd":
         super().set_random_state(seed, state)
         self.low_pass.set_random_state(seed, state)
@@ -210,8 +236,14 @@ class RandomGaussianNoised(RandomizableTransform, MapTransform):
 
     backend = RandomGaussianNoise.backend
 
-    def __init__(self, keys: KeysCollection, sigma: Tuple[float, float], ignore_zeros: bool = False, prob: float = 0.1,
-                 allow_missing_keys: bool = False) -> None:
+    def __init__(
+        self,
+        keys: KeysCollection,
+        sigma: Tuple[float, float],
+        ignore_zeros: bool = False,
+        prob: float = 0.1,
+        allow_missing_keys: bool = False,
+    ) -> None:
         """
         Args:
             keys: keys of the corresponding items to be transformed.
@@ -223,10 +255,12 @@ class RandomGaussianNoised(RandomizableTransform, MapTransform):
         """
         MapTransform.__init__(self, keys, allow_missing_keys)
         RandomizableTransform.__init__(self, prob)
-        self.noised = RandomGaussianNoise(sigma=sigma, ignore_zeros=ignore_zeros, prob=prob)
+        self.noised = RandomGaussianNoise(
+            sigma=sigma, ignore_zeros=ignore_zeros, prob=prob
+        )
 
     def set_random_state(
-            self, seed: Optional[int] = None, state: Optional[np.random.RandomState] = None
+        self, seed: Optional[int] = None, state: Optional[np.random.RandomState] = None
     ) -> "RandomGaussianNoise":
         super().set_random_state(seed, state)
         self.noised.set_random_state(seed, state)
@@ -254,8 +288,15 @@ class RandomHighPassSharpend(RandomizableTransform, MapTransform):
 
     backend = RandomHighPassSharpen.backend
 
-    def __init__(self, keys: KeysCollection, sigma: Tuple[float, float], sigma2: Tuple[float, float],
-                 ignore_zeros: bool = False, prob: float = 0.1, allow_missing_keys: bool = False) -> None:
+    def __init__(
+        self,
+        keys: KeysCollection,
+        sigma: Tuple[float, float],
+        sigma2: Tuple[float, float],
+        ignore_zeros: bool = False,
+        prob: float = 0.1,
+        allow_missing_keys: bool = False,
+    ) -> None:
         """
         Args:
             keys: keys of the corresponding items to be transformed.
@@ -268,10 +309,12 @@ class RandomHighPassSharpend(RandomizableTransform, MapTransform):
         """
         MapTransform.__init__(self, keys, allow_missing_keys)
         RandomizableTransform.__init__(self, prob)
-        self.high_pass = RandomHighPassSharpen(sigma=sigma, sigma2=sigma2, ignore_zeros=ignore_zeros, prob=prob)
+        self.high_pass = RandomHighPassSharpen(
+            sigma=sigma, sigma2=sigma2, ignore_zeros=ignore_zeros, prob=prob
+        )
 
     def set_random_state(
-            self, seed: Optional[int] = None, state: Optional[np.random.RandomState] = None
+        self, seed: Optional[int] = None, state: Optional[np.random.RandomState] = None
     ) -> "RandomHighPassSharpend":
         super().set_random_state(seed, state)
         self.high_pass.set_random_state(seed, state)
@@ -290,3 +333,89 @@ class RandomHighPassSharpend(RandomizableTransform, MapTransform):
         for key in self.key_iterator(d):
             d[key] = self.high_pass(d[key], randomize=False)
         return d
+
+
+class RandomMaskedViewsd(MapTransform):
+    """
+    Dictionary-based wrapper of :py:class:`cryosiam.transforms.RandomMaskedViews`.
+
+    Extracts two random overlapping views from input images and creates masks for each view.
+    Handles multiple input keys (e.g., ["image"] or ["image", "noisy_image"]) and generates
+    corresponding output with keys like ["image_1", "image_2", "mask_1", "mask_2"], or with
+    noisy variants if present.
+    """
+
+    backend = RandomMaskedViews.backend
+
+    def __init__(
+        self,
+        keys: KeysCollection,
+        input_image_size: Union[Sequence[int], int],
+        view_size: Union[Sequence[int], int],
+        overlap: Union[Sequence[float], float] = 0.5,
+        allow_missing_keys: bool = False,
+    ) -> None:
+        """
+        Args:
+            keys: keys of the corresponding items to be transformed (e.g., ["image"] or ["image", "noisy_image"]).
+                See also: :py:class:`monai.transforms.compose.MapTransform`
+            input_image_size: size of the input patch (e.g., [64, 64] for 2D or [64, 64, 64] for 3D)
+            view_size: size of each view to extract (e.g., [32, 32] for 2D or [32, 32, 32] for 3D)
+            overlap: overlap fraction between the two views (0.0 to 1.0). Default is 0.5.
+            allow_missing_keys: don't raise exception if key is missing.
+        """
+        MapTransform.__init__(self, keys, allow_missing_keys)
+        self.masker = RandomMaskedViews(
+            input_image_size=input_image_size,
+            view_size=view_size,
+            overlap=overlap,
+        )
+
+    def __call__(self, data: Dict) -> Dict[Hashable, NdarrayOrTensor]:
+        """
+        Extract two views and masks from input images.
+
+        Args:
+            data: Dictionary containing input images with keys specified in self.keys.
+                  Example: {"image": torch.Tensor, "noisy_image": torch.Tensor}
+
+        Returns:
+            Dictionary with extracted views and masks:
+            Example: {
+                "image_1": torch.Tensor,
+                "image_2": torch.Tensor,
+                "mask_1": torch.Tensor,
+                "mask_2": torch.Tensor,
+                "noisy_image_1": torch.Tensor,  # if present
+                "noisy_image_2": torch.Tensor,  # if present
+            }
+            Note: masks are shared across all input images and generated only once.
+        """
+        d = dict(data)
+
+        # All keys share the same random view positions
+        self.masker.randomize(None)
+
+        output = {}
+        mask1 = None
+        mask2 = None
+
+        for key in self.key_iterator(d):
+            img = d[key]
+            # Apply the masking transform to extract views
+            views_dict = self.masker(img)
+
+            # Add views with key suffix
+            output[f"{key}_1"] = views_dict["view1"]
+            output[f"{key}_2"] = views_dict["view2"]
+
+            # Store masks (they should be the same for all keys since we use the same view positions)
+            if mask1 is None:
+                mask1 = views_dict["mask1"]
+                mask2 = views_dict["mask2"]
+
+        # Add shared masks (not prefixed with key name)
+        output["mask_1"] = mask1
+        output["mask_2"] = mask2
+
+        return output

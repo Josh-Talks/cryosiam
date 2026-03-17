@@ -31,7 +31,7 @@ from monai.transforms import (
     ScaleIntensityRanged,
 )
 
-from .data import MrcReader, TiffReader
+from .data import MrcReader  # , TiffReader
 from .utils import basic_train_val_split
 from .networks.nets import DenseSimSiam
 from .transforms import (

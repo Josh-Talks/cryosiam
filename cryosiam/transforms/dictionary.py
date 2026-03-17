@@ -1,7 +1,9 @@
+import torch
 import numpy as np
 from monai.config import KeysCollection
 from monai.utils import convert_to_tensor
 from monai.data.meta_obj import get_track_meta
+from monai.utils.type_conversion import convert_to_dst_type
 from typing import Optional, Dict, Hashable, Tuple, Sequence, Union
 from monai.config.type_definitions import NdarrayOrTensor
 from monai.transforms.compose import MapTransform, RandomizableTransform
@@ -352,7 +354,7 @@ class RandomMaskedViewsd(MapTransform):
         keys: KeysCollection,
         input_image_size: Union[Sequence[int], int],
         view_size: Union[Sequence[int], int],
-        overlap: Union[Sequence[float], float] = 0.5,
+        overlap: float = 0.5,
         allow_missing_keys: bool = False,
     ) -> None:
         """
@@ -361,7 +363,8 @@ class RandomMaskedViewsd(MapTransform):
                 See also: :py:class:`monai.transforms.compose.MapTransform`
             input_image_size: size of the input patch (e.g., [64, 64] for 2D or [64, 64, 64] for 3D)
             view_size: size of each view to extract (e.g., [32, 32] for 2D or [32, 32, 32] for 3D)
-            overlap: overlap fraction between the two views (0.0 to 1.0). Default is 0.5.
+            overlap: exact overlap fraction between the two views relative to the view
+                area/volume (0.0 to 1.0). Default is 0.5.
             allow_missing_keys: don't raise exception if key is missing.
         """
         MapTransform.__init__(self, keys, allow_missing_keys)
@@ -393,7 +396,11 @@ class RandomMaskedViewsd(MapTransform):
         """
         d = dict(data)
 
-        # All keys share the same random view positions
+        # Generate shared random view positions once for all keys.
+        # We do NOT call self.masker(img) because RandomMaskedViews.__call__
+        # internally calls self.randomize() again, which would overwrite these
+        # positions with new ones for every key.  Instead we use the internal
+        # helpers directly so every key is cropped at the same locations.
         self.masker.randomize(None)
 
         output = {}
@@ -402,17 +409,26 @@ class RandomMaskedViewsd(MapTransform):
 
         for key in self.key_iterator(d):
             img = d[key]
-            # Apply the masking transform to extract views
-            views_dict = self.masker(img)
+            img_tensor = convert_to_tensor(img, track_meta=get_track_meta())
 
-            # Add views with key suffix
-            output[f"{key}_1"] = views_dict["view1"]
-            output[f"{key}_2"] = views_dict["view2"]
+            # Extract views at the pre-generated (shared) positions
+            view1 = self.masker._extract_view(img_tensor, self.masker.view1_start)
+            view2 = self.masker._extract_view(img_tensor, self.masker.view2_start)
 
-            # Store masks (they should be the same for all keys since we use the same view positions)
+            view1_out, *_ = convert_to_dst_type(view1, dst=img, dtype=view1.dtype)
+            view2_out, *_ = convert_to_dst_type(view2, dst=img, dtype=view2.dtype)
+
+            output[f"{key}_1"] = view1_out
+            output[f"{key}_2"] = view2_out
+
+            # Masks depend only on the view positions, so create them once
             if mask1 is None:
-                mask1 = views_dict["mask1"]
-                mask2 = views_dict["mask2"]
+                mask1 = torch.from_numpy(
+                    self.masker._create_mask(img_tensor.shape, self.masker.view1_start)
+                ).long()
+                mask2 = torch.from_numpy(
+                    self.masker._create_mask(img_tensor.shape, self.masker.view2_start)
+                ).long()
 
         # Add shared masks (not prefixed with key name)
         output["mask_1"] = mask1

@@ -339,7 +339,9 @@ class DenseSimSiamModule(pl.LightningModule):
 
     def prepare_data(self):
         data_root = os.path.normpath(self.config.data_folder)
-        train_val_path = os.path.join(self.config.log_dir, "train_val_split.pkl")
+        train_val_path = os.path.join(
+            self.config.logging.log_dir, "train_val_split.pkl"
+        )
         if not os.path.isfile(train_val_path):
             train_files, val_files = basic_train_val_split(
                 data_root,
@@ -363,7 +365,9 @@ class DenseSimSiamModule(pl.LightningModule):
 
     def initialization(self):
         # set data
-        train_val_path = os.path.join(self.config.log_dir, "train_val_split.pkl")
+        train_val_path = os.path.join(
+            self.config.logging.log_dir, "train_val_split.pkl"
+        )
         with open(train_val_path, "rb") as f:
             data = pickle.load(f)
             train_files, val_files = data["train_files"], data["val_files"]

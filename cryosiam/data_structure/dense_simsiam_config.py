@@ -2,13 +2,11 @@ from __future__ import annotations
 
 from typing import Any, List, Literal, Mapping, Optional, Sequence, Tuple, Union
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 import yaml
 
-
-class _StrictModel(BaseModel):
-    class Config:
-        extra = "forbid"
+from .utils import _StrictModel
+from .logging import logging_type
 
 
 class DenseSimSiamDataConfig(_StrictModel):
@@ -69,14 +67,14 @@ class DenseSimSiamHyperParametersConfig(_StrictModel):
     fix_pred_lr: bool
     max_epochs: int = Field(..., ge=1)
     lr_warmup_epochs: Optional[int] = Field(None, ge=1)
-
+    val_interval: int = Field(..., ge=1)
     cache_rate: float = Field(0.0, ge=0.0, le=1.0)
     replace_rate: Optional[float] = Field(None, ge=0.0, le=1.0)
 
 
 class DenseSimSiamConfig(_StrictModel):
     data_folder: str
-    log_dir: str
+    logging: logging_type
     file_extension: Literal[".mrc", ".rec", ".tif", ".tiff"]
     train_files: Optional[List[str]]
     validation_ratio: float = Field(..., ge=0.0, le=1.0)

@@ -11,6 +11,7 @@ from .logging import logging_type
 
 class DenseSimSiamDataConfig(_StrictModel):
     patch_size: List[int] = Field(..., min_items=1)
+    patch_overlap: float = Field(..., ge=0.0, le=1.0)
     view_size: List[int] = Field(..., min_items=1)
     view_overlap: float = Field(..., ge=0.0, le=1.0)
     min: float
@@ -77,6 +78,7 @@ class DenseSimSiamConfig(_StrictModel):
     logging: logging_type
     file_extension: Literal[".mrc", ".rec", ".tif", ".tiff"]
     train_files: Optional[List[str]]
+    val_files: Optional[List[str]] = None
     validation_ratio: float = Field(..., ge=0.0, le=1.0)
     patches_folder: Optional[str] = None
     noisy_data_folder: Optional[str] = None

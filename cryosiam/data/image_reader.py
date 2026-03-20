@@ -60,10 +60,12 @@ class MrcReader(ImageReader):
         kwargs_ = self.kwargs.copy()
         kwargs_.update(kwargs)
         for name in filenames:
+            # Open in read-write mode if writable arrays are requested
+            file_mode = 'r+' if self.writable else 'r'
             if self.read_in_mem:
-                mrc = mrcfile.open(name, mode='r', permissive=True)
+                mrc = mrcfile.open(name, mode=file_mode, permissive=True)
             else:
-                mrc = mrcfile.mmap(name, mode='r', permissive=True)
+                mrc = mrcfile.mmap(name, mode=file_mode, permissive=True)
             img_.append(mrc)
         return img_ if len(filenames) > 1 else img_[0]
 
@@ -85,8 +87,6 @@ class MrcReader(ImageReader):
             header = {name: header[name] for name in header.dtype.names if name in important_info}
             header['voxel_size'] = np.asarray((img.voxel_size['x'], img.voxel_size['y'], img.voxel_size['z']))
             data = i.data[:]
-            if self.writable:
-                data.setflags(write=True)
             img_array.append(data)
             if self.channel_dim is None:  # default to "no_channel" or -1
                 header["original_channel_dim"] = "no_channel"

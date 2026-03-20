@@ -258,7 +258,7 @@ class DenseSimSiamModule(pl.LightningModule):
         # define the data transforms
         train_transforms = Compose(
             [
-                LoadImaged(keys=keys, reader=reader()),
+                LoadImaged(keys=keys, reader=reader(read_in_mem=True)),
                 EnsureChannelFirstd(keys=keys, channel_dim="no_channel"),
                 ScaleIntensityRanged(
                     keys=keys,

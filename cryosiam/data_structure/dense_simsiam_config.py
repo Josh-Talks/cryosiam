@@ -81,7 +81,7 @@ class DenseSimSiamConfig(_StrictModel):
     patches_folder: Optional[str] = None
     noisy_data_folder: Optional[str] = None
     noisy_patches_folder: Optional[str] = None
-
+    continue_training: bool = False
     parameters: DenseSimSiamParametersConfig
     hyper_parameters: DenseSimSiamHyperParametersConfig
 

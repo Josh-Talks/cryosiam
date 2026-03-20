@@ -359,6 +359,7 @@ class DenseSimSiamModule(pl.LightningModule):
                     else None
                 ),
                 file_ext=self.config.file_extension,
+                val_files=self.config.val_files,
             )
             with open(train_val_path, "wb") as f:
                 pickle.dump({"train_files": train_files, "val_files": val_files}, f)

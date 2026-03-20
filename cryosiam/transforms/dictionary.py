@@ -341,7 +341,8 @@ class RandomMaskedViewsd(MapTransform):
     """
     Dictionary-based wrapper of :py:class:`cryosiam.transforms.RandomMaskedViews`.
 
-    Extracts two random overlapping views from input images and creates masks for each view.
+    Extracts two random overlapping views from input images and creates overlap-coordinate
+    masks for each view.
     Handles multiple input keys (e.g., ["image"] or ["image", "noisy_image"]) and generates
     corresponding output with keys like ["image_1", "image_2", "mask_1", "mask_2"], or with
     noisy variants if present.
@@ -355,6 +356,7 @@ class RandomMaskedViewsd(MapTransform):
         input_image_size: Union[Sequence[int], int],
         view_size: Union[Sequence[int], int],
         overlap: float = 0.5,
+        overlap_mode: str = "diagonal",
         allow_missing_keys: bool = False,
     ) -> None:
         """
@@ -365,6 +367,9 @@ class RandomMaskedViewsd(MapTransform):
             view_size: size of each view to extract (e.g., [32, 32] for 2D or [32, 32, 32] for 3D)
             overlap: exact overlap fraction between the two views relative to the view
                 area/volume (0.0 to 1.0). Default is 0.5.
+            overlap_mode: how to distribute overlap across axes: 'side_by_side' (offset along last axis),
+                'vertical' (offset along first axis), or 'diagonal' (symmetric offset on all axes).
+                Default is 'diagonal'.
             allow_missing_keys: don't raise exception if key is missing.
         """
         MapTransform.__init__(self, keys, allow_missing_keys)
@@ -372,6 +377,7 @@ class RandomMaskedViewsd(MapTransform):
             input_image_size=input_image_size,
             view_size=view_size,
             overlap=overlap,
+            overlap_mode=overlap_mode,
         )
 
     def __call__(self, data: Dict) -> Dict[Hashable, NdarrayOrTensor]:
@@ -393,6 +399,8 @@ class RandomMaskedViewsd(MapTransform):
                 "noisy_image_2": torch.Tensor,  # if present
             }
             Note: masks are shared across all input images and generated only once.
+            Each mask has shape [spatial_dims, 2] and stores inclusive overlap coordinates
+            [start, end] in that view's local frame.
         """
         d = dict(data)
 
@@ -424,10 +432,14 @@ class RandomMaskedViewsd(MapTransform):
             # Masks depend only on the view positions, so create them once
             if mask1 is None:
                 mask1 = torch.from_numpy(
-                    self.masker._create_mask(img_tensor.shape, self.masker.view1_start)
+                    self.masker._create_mask(
+                        self.masker.view1_start, self.masker.view2_start
+                    )
                 ).long()
                 mask2 = torch.from_numpy(
-                    self.masker._create_mask(img_tensor.shape, self.masker.view2_start)
+                    self.masker._create_mask(
+                        self.masker.view2_start, self.masker.view1_start
+                    )
                 ).long()
 
         # Add shared masks (not prefixed with key name)

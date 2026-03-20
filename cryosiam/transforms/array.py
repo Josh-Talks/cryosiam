@@ -2,7 +2,7 @@ import math
 import torch
 import numpy as np
 from scipy import ndimage
-from typing import Any, Optional, Tuple, Sequence, Union
+from typing import Any, Optional, Tuple, Sequence, Union, Literal
 from monai.data.meta_obj import get_track_meta
 from monai.utils.enums import TransformBackends
 from monai.config.type_definitions import NdarrayOrTensor
@@ -362,7 +362,7 @@ class RandomMaskedViews(Transform):
 
     This transform randomly selects two views from a 2D or 3D patch, ensuring they have
     an exact overlap area/volume relative to the size of one view. Each view is cropped from
-    the original patch, and masks are generated to indicate valid regions in each view.
+    the original patch, and masks are generated as overlap coordinates for each view.
 
     Args:
         input_image_size: size of the input patch (e.g., [64, 64] for 2D or [64, 64, 64] for 3D)
@@ -379,6 +379,7 @@ class RandomMaskedViews(Transform):
         input_image_size: Union[Sequence[int], int],
         view_size: Union[Sequence[int], int],
         overlap: float = 0.5,
+        overlap_mode: Literal["side_by_side", "vertical", "diagonal"] = "diagonal",
     ) -> None:
         # Ensure input_image_size and view_size are sequences
         self.input_image_size = (
@@ -390,6 +391,7 @@ class RandomMaskedViews(Transform):
             list(view_size) if isinstance(view_size, (list, tuple)) else [view_size]
         )
         self.spatial_dims = len(self.input_image_size)
+        self.overlap_mode = overlap_mode
 
         if isinstance(overlap, (list, tuple)):
             raise ValueError(
@@ -415,6 +417,13 @@ class RandomMaskedViews(Transform):
         if not (0.0 <= self.overlap <= 1.0):
             raise ValueError(f"overlap must be between 0.0 and 1.0, got {self.overlap}")
 
+        # Validate overlap_mode
+        if self.overlap_mode not in ["side_by_side", "vertical", "diagonal"]:
+            raise ValueError(
+                f"overlap_mode must be 'side_by_side', 'vertical', or 'diagonal', "
+                f"got {self.overlap_mode}"
+            )
+
         self.view1_start = None
         self.view2_start = None
         self.R = np.random.RandomState()
@@ -436,6 +445,10 @@ class RandomMaskedViews(Transform):
             )
 
         self.target_overlap_volume = rounded_target
+
+        # Compute the overlap shape based on overlap_mode
+        self._compute_overlap_shape()
+
         self._feasible_offsets = self._compute_feasible_offsets()
         if self.target_overlap_volume > 0 and not self._feasible_offsets:
             raise ValueError(
@@ -461,68 +474,161 @@ class RandomMaskedViews(Transform):
         return self
 
     def randomize(self, data: Optional[Any] = None) -> None:
-        """Generate random positions for view1 and view2 with exact overlap volume."""
+        """Generate random positions for view1 and view2 with exact overlap shape.
+
+        Since overlap is now fixed in shape, the offset between view1_start and view2_start
+        is deterministic. This method randomly samples view1_start within valid ranges,
+        then computes view2_start based on the required offset.
+        """
         if self.target_overlap_volume == 0:
             abs_offsets = self._sample_zero_overlap_offsets()
-        else:
-            index = self.R.randint(0, len(self._feasible_offsets))
-            abs_offsets = self._feasible_offsets[index]
+            self.view1_start = list(abs_offsets)
+            self.view2_start = [
+                start + offset
+                for start, offset in zip(self.view1_start, (0,) * self.spatial_dims)
+            ]
+            return
 
+        # Use the required offset (should be the only element)
+        required_offset = self._feasible_offsets[0]
+
+        # Randomly sample view1_start such that view2_start is also valid
         self.view1_start = []
         self.view2_start = []
 
-        for delta, max_start in zip(abs_offsets, self._max_start):
-            if delta == 0:
-                start1 = int(self.R.randint(0, max_start + 1))
-                start2 = start1
-            else:
-                sign = -1 if self.R.randint(0, 2) == 0 else 1
-                if sign > 0:
-                    start1 = int(self.R.randint(0, max_start - delta + 1))
-                    start2 = start1 + delta
-                else:
-                    start1 = int(self.R.randint(delta, max_start + 1))
-                    start2 = start1 - delta
+        for i, (offset_i, max_start_i) in enumerate(
+            zip(required_offset, self._max_start)
+        ):
+            # Valid range for p1[i]
+            p1_min = max(0, -offset_i)
+            p1_max = min(max_start_i, max_start_i - offset_i)
+
+            start1 = int(self.R.randint(p1_min, p1_max + 1))
+            start2 = start1 + offset_i
 
             self.view1_start.append(start1)
             self.view2_start.append(start2)
 
+    def _compute_overlap_shape(self) -> None:
+        """Compute the overlap region shape based on overlap_mode.
+
+        This ensures the overlap region has a consistent, fixed shape for all sampled
+        view pairs, enabling batching of loss calculations.
+        """
+        if self.target_overlap_volume == 0:
+            # Zero overlap: no region
+            self.overlap_shape = [0] * self.spatial_dims
+            return
+
+        if self.overlap_mode == "diagonal":
+            # Symmetric overlap on all axes
+            # For exact overlap_shape with symmetric distribution, we need:
+            # overlap_len^spatial_dims = target_overlap_volume
+            # However, this may not yield an integer overlap_len.
+            # We use the rounded value and verify it's valid.
+            overlap_len = int(
+                round(self.target_overlap_volume ** (1.0 / self.spatial_dims))
+            )
+            self.overlap_shape = [overlap_len] * self.spatial_dims
+
+            # Verify the computation is close enough (within rounding)
+            computed_volume = int(np.prod(self.overlap_shape))
+            if computed_volume != self.target_overlap_volume:
+                # Try to find a valid overlap_len by searching nearby values
+                found = False
+                for candidate in [overlap_len - 1, overlap_len + 1]:
+                    if candidate > 0:
+                        candidate_volume = candidate**self.spatial_dims
+                        relative_error = (
+                            abs(self.target_overlap_volume - candidate_volume)
+                            / self.target_overlap_volume
+                        )
+                        if relative_error <= 0.01:  # Within 1% tolerance
+                            overlap_len = candidate
+                            self.overlap_shape = [overlap_len] * self.spatial_dims
+                            found = True
+                            break
+
+                if not found:
+                    raise ValueError(
+                        f"overlap_mode='diagonal' with overlap={self.overlap} cannot produce "
+                        f"exact integer dimensions. target_volume={self.target_overlap_volume}, "
+                        f"computed_volume={computed_volume}. "
+                        f"Use an overlap value where view_size^spatial_dims * overlap is a perfect power."
+                    )
+
+        elif self.overlap_mode == "side_by_side":
+            # Offset along last (width) axis; full overlap on all other axes
+            # overlap_shape = [view_size[0], ..., view_size[-2], overlap_width]
+            overlap_width = int(
+                self.target_overlap_volume / int(np.prod(self.view_size[:-1]))
+            )
+            if overlap_width <= 0 or overlap_width > self.view_size[-1]:
+                raise ValueError(
+                    f"overlap_mode='side_by_side' with overlap={self.overlap} is incompatible. "
+                    f"Computed overlap_width={overlap_width}, but view_size[-1]={self.view_size[-1]}. "
+                    f"Choose an overlap that divides evenly by {int(np.prod(self.view_size[:-1]))}"
+                )
+            self.overlap_shape = list(self.view_size[:-1]) + [overlap_width]
+
+        elif self.overlap_mode == "vertical":
+            # Offset along first (height/depth) axis; full overlap on all other axes
+            # overlap_shape = [overlap_height, view_size[1], ..., view_size[-1]]
+            overlap_height = int(
+                self.target_overlap_volume / int(np.prod(self.view_size[1:]))
+            )
+            if overlap_height <= 0 or overlap_height > self.view_size[0]:
+                raise ValueError(
+                    f"overlap_mode='vertical' with overlap={self.overlap} is incompatible. "
+                    f"Computed overlap_height={overlap_height}, but view_size[0]={self.view_size[0]}. "
+                    f"Choose an overlap that divides evenly by {int(np.prod(self.view_size[1:]))}"
+                )
+            self.overlap_shape = [overlap_height] + list(self.view_size[1:])
+
     def _compute_feasible_offsets(self) -> Sequence[Tuple[int, ...]]:
-        """Precompute absolute crop offsets that realize the exact target overlap volume."""
+        """Precompute absolute crop offsets that realize the target overlap shape.
+
+        For a fixed overlap_mode and overlap specification, the offset between views
+        must be exactly [view_size[i] - overlap_shape[i], ...] for all valid placements.
+        This ensures the overlap region always has the same shape.
+        """
         if self.target_overlap_volume == 0:
             return []
 
-        allowed_lengths = []
-        for view_sz, max_start in zip(self.view_size, self._max_start):
-            min_overlap = max(1, view_sz - max_start)
-            allowed_lengths.append(range(min_overlap, view_sz + 1))
+        # For the fixed overlap_shape, compute the exact offset required
+        # offset[i] = view_size[i] - overlap_shape[i]
+        required_offset = tuple(
+            view_sz - overlap_len
+            for view_sz, overlap_len in zip(self.view_size, self.overlap_shape)
+        )
 
-        feasible_offsets = []
+        # Check if this offset is feasible given the input_image_size
+        # For view1 at position p1 and view2 at position p2 = p1 + offset:
+        # - Both must fit within [0, max_start[i]]
+        # - So: max(p1) = max_start[i], min(p2) = 0
+        # - If p2 = p1 + offset, then min(p1) = -offset[i] (invalid)
+        # - So we need: p1 + offset[i] <= max_start[i]
+        # - And: p1 >= 0
+        # - Valid range for p1[i]: [max(0, -offset[i]), min(max_start[i], max_start[i] - offset[i])]
 
-        def recurse(axis: int, remaining_volume: int, current_lengths: list) -> None:
-            if axis == self.spatial_dims - 1:
-                last_length = remaining_volume
-                if last_length in allowed_lengths[axis]:
-                    offsets = tuple(
-                        view_sz - overlap_len
-                        for view_sz, overlap_len in zip(
-                            self.view_size, current_lengths + [last_length]
-                        )
-                    )
-                    feasible_offsets.append(offsets)
-                return
+        valid = True
+        for i, (offset_i, max_start_i) in enumerate(
+            zip(required_offset, self._max_start)
+        ):
+            # p1[i] can range such that p2[i] = p1[i] + offset[i] is also valid
+            # Constraints: 0 <= p1[i] <= max_start[i] and 0 <= p1[i] + offset[i] <= max_start[i]
+            p1_min = max(0, -offset_i)
+            p1_max = min(max_start_i, max_start_i - offset_i)
 
-            for overlap_len in allowed_lengths[axis]:
-                if remaining_volume % overlap_len != 0:
-                    continue
-                recurse(
-                    axis + 1,
-                    remaining_volume // overlap_len,
-                    current_lengths + [overlap_len],
-                )
+            if p1_min > p1_max:
+                valid = False
+                break
 
-        recurse(0, self.target_overlap_volume, [])
-        return sorted(set(feasible_offsets))
+        if not valid:
+            return []
+
+        # Return the single required offset (randomization of positions happens in randomize())
+        return [required_offset]
 
     def _sample_zero_overlap_offsets(self) -> Tuple[int, ...]:
         """Sample absolute crop offsets that guarantee exactly zero overlap volume."""
@@ -558,12 +664,27 @@ class RandomMaskedViews(Transform):
         return img[tuple(slices)]
 
     def _create_mask(
-        self, img_shape: Sequence[int], view_start: Sequence[int]
+        self, view_start: Sequence[int], other_view_start: Sequence[int]
     ) -> np.ndarray:
-        """Create a binary mask for the view region (all ones since the entire view is valid)."""
-        mask_shape = [1] + self.view_size
-        mask = np.ones(mask_shape, dtype=np.uint8)
-        return mask
+        """Create overlap coordinates [start, end] per axis in the local view frame.
+
+        The output shape is [spatial_dims, 2], matching the coordinate format expected by
+        DenseSimSiam.select_overlap_pixels for each sample.
+        """
+        coords = np.zeros((self.spatial_dims, 2), dtype=np.int64)
+        for axis, view_sz in enumerate(self.view_size):
+            start_a = int(view_start[axis])
+            end_a = start_a + int(view_sz) - 1
+            start_b = int(other_view_start[axis])
+            end_b = start_b + int(view_sz) - 1
+
+            overlap_start = max(start_a, start_b)
+            overlap_end = min(end_a, end_b)
+
+            # Inclusive coordinates in this view's local reference frame.
+            coords[axis, 0] = overlap_start - start_a
+            coords[axis, 1] = overlap_end - start_a
+        return coords
 
     def __call__(self, data: dict) -> dict:
         """
@@ -590,9 +711,9 @@ class RandomMaskedViews(Transform):
         view1 = self._extract_view(img_tensor, self.view1_start)
         view2 = self._extract_view(img_tensor, self.view2_start)
 
-        # Create masks (all ones for valid regions)
-        mask1 = self._create_mask(img_tensor.shape, self.view1_start)
-        mask2 = self._create_mask(img_tensor.shape, self.view2_start)
+        # Create overlap coordinate masks in each view's local frame.
+        mask1 = self._create_mask(self.view1_start, self.view2_start)
+        mask2 = self._create_mask(self.view2_start, self.view1_start)
 
         # Convert to appropriate type
         view1_out, *_ = convert_to_dst_type(view1, dst=img, dtype=view1.dtype)

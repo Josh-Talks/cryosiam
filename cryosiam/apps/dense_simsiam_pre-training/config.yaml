@@ -1,0 +1,70 @@
+data_folder: /scratch/talks/data/cryoetsim_data/combined_clean_inverted_scaled
+patches_folder: /scratch/talks/cryosiam_experiments/dense_simsiam_pre-training/patches_0
+logging:
+  logger: "wandb"
+  project: "dense_simsiam_pre-training"
+  name: "test_run1"
+  log_dir: /g/kreshuk/talks/cryosiam_results/dense_simsiam_pre-training
+#pretrained_model: '/g/zaugg/stojanov/simulated_datasets/experiments/dense_simsiam/version_1/model/last.ckpt'
+file_extension: '.mrc'
+
+train_files: ['sample_1_Vol.mrc']
+
+val_files: null
+validation_ratio: 0.1
+noisy_data_folder: null
+noisy_patches_folder: null
+
+continue_training: False
+
+parameters:
+  nodes: 1
+  gpu_devices: 1
+  data:
+    patch_size: [ 128, 128, 128 ]
+    patch_overlap: 0.5
+    view_size: [ 32, 32, 32 ]
+    view_overlap: 0.5
+    min: 0
+    max: 1
+    mean: 0
+    std:  1
+  transforms:
+    low_pass_sigma_range: null
+    high_pass_sigma_range: null
+    high_pass_sigma2_range: null
+    noise_sigma_range: null
+    combine_transforms: False
+    drop_out_prob: 0.0
+    drop_out: 0.0
+    use_noisy_input: False
+  network:
+    block_type: 'bottleneck'
+    spatial_dims: 3
+    in_channels: 1
+    num_layers: [1,1,1,1]
+    num_filters: [64, 128, 256, 512]
+    fpn_channels: 128
+    no_max_pool: True
+    dim: 2048
+    pred_dim: 512
+    dense_dim: 32
+    dense_pred_dim: 64
+    include_levels_loss: False
+    add_fpn_later_conv: False
+    decoder_type: "fpn"
+    fpn_layers: 2
+    include_global_loss: True
+    weight_dense_loss: null
+
+hyper_parameters:
+  batch_size: 1
+  lr: 0.001
+  momentum: 0.9
+  weight_decay: 0.00001
+  fix_pred_lr: False
+  max_epochs: 2
+  lr_warmup_epochs: null
+  val_interval: 1
+  cache_rate: 0
+  replace_rate: null

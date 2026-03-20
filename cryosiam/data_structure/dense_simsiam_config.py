@@ -43,7 +43,6 @@ class DenseSimSiamNetworkConfig(_StrictModel):
     pred_dim: int = Field(..., ge=1)
     dense_dim: int = Field(..., ge=1)
     dense_pred_dim: int = Field(..., ge=1)
-
     include_levels_loss: Union[bool, int] = False
     add_fpn_later_conv: bool = False
     decoder_type: Literal["fpn", "bifpn"] = "fpn"
@@ -75,12 +74,12 @@ class DenseSimSiamHyperParametersConfig(_StrictModel):
 
 class DenseSimSiamConfig(_StrictModel):
     data_folder: str
+    patches_folder: Optional[str] = None
     logging: logging_type
     file_extension: Literal[".mrc", ".rec", ".tif", ".tiff"]
     train_files: Optional[List[str]]
     val_files: Optional[List[str]] = None
     validation_ratio: float = Field(..., ge=0.0, le=1.0)
-    patches_folder: Optional[str] = None
     noisy_data_folder: Optional[str] = None
     noisy_patches_folder: Optional[str] = None
     continue_training: bool = False

@@ -1,10 +1,10 @@
 data_folder: /scratch/talks/data/cryoetsim_data/combined_clean_inverted_scaled
-patches_folder: /scratch/talks/cryosiam_experiments/dense_simsiam_pre-training/patches_0
+patches_folder: /scratch/talks/cryosiam_experiments/dense_simsiam_pretraining/patches_0
 logging:
   logger: "wandb"
   project: "dense_simsiam_pre-training"
   name: "test_run1"
-  log_dir: /g/kreshuk/talks/cryosiam_results/dense_simsiam_pre-training
+  log_dir: /g/kreshuk/talks/cryosiam_results/dense_simsiam_pretraining
 #pretrained_model: '/g/zaugg/stojanov/simulated_datasets/experiments/dense_simsiam/version_1/model/last.ckpt'
 file_extension: '.mrc'
 

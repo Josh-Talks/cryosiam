@@ -8,7 +8,7 @@ from lightning.pytorch.loggers import TensorBoardLogger, WandbLogger
 from lightning.pytorch.strategies import DDPStrategy
 
 from cryosiam.data_structure.dense_simsiam_config import load_dense_simsiam_config
-from cryosiam.module import DenseSimSiamModule
+from cryosiam.apps.dense_simsiam_pretraining.module import DenseSimSiamModule
 
 
 def main(
@@ -28,7 +28,7 @@ def main(
     net = DenseSimSiamModule(cfg)
 
     checkpoint_callback = ModelCheckpoint(
-        dirpath=os.path.join(cfg.logging.log_dir, "model"),
+        dirpath=os.path.join(cfg.logging.log_dir, cfg.logging.name),
         filename="model_best",
         every_n_epochs=cfg.hyper_parameters.val_interval,
         monitor="val_loss",
@@ -78,7 +78,8 @@ def main(
 
     if cfg.continue_training:
         trainer.fit(
-            net, ckpt_path=os.path.join(cfg.logging.log_dir, "model", "last.ckpt")
+            net,
+            ckpt_path=os.path.join(cfg.logging.log_dir, cfg.logging.name, "last.ckpt"),
         )
     else:
         trainer.fit(net)

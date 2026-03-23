@@ -12,11 +12,12 @@ class LoggerConfig(_StrictModel):
 class WandbConfig(LoggerConfig):
     logger: Literal["wandb"] = "wandb"
     project: str
-    name: Optional[str] = None
+    name: str
 
 
 class TensorBoardConfig(LoggerConfig):
     logger: Literal["tensorboard"] = "tensorboard"
+    name: str
 
 
 logging_type = Annotated[Union[WandbConfig, TensorBoardConfig], Discriminator("logger")]

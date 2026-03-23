@@ -18,6 +18,7 @@ from .array import (
     RandomGaussianNoise,
     RandomHighPassSharpen,
     RandomMaskedViews,
+    RandomMaskedViews2,
 )
 
 
@@ -443,6 +444,70 @@ class RandomMaskedViewsd(MapTransform):
                 ).long()
 
         # Add shared masks (not prefixed with key name)
+        output["mask_1"] = mask1
+        output["mask_2"] = mask2
+
+        return output
+
+
+class RandomMaskedViewsd2(MapTransform):
+    """Dictionary-based wrapper of :py:class:`cryosiam.transforms.RandomMaskedViews2`.
+
+    Extracts two random overlapping views from input images using a fixed overlap shape
+    selected automatically by the transform.
+    """
+
+    backend = RandomMaskedViews2.backend
+
+    def __init__(
+        self,
+        keys: KeysCollection,
+        input_image_size: Union[Sequence[int], int],
+        view_size: Union[Sequence[int], int],
+        overlap: float = 0.5,
+        allow_missing_keys: bool = False,
+    ) -> None:
+        MapTransform.__init__(self, keys, allow_missing_keys)
+        self.masker = RandomMaskedViews2(
+            input_image_size=input_image_size,
+            view_size=view_size,
+            overlap=overlap,
+        )
+
+    def __call__(self, data: Dict) -> Dict[Hashable, NdarrayOrTensor]:
+        d = dict(data)
+
+        self.masker.randomize(None)
+
+        output = {}
+        mask1 = None
+        mask2 = None
+
+        for key in self.key_iterator(d):
+            img = d[key]
+            img_tensor = convert_to_tensor(img, track_meta=get_track_meta())
+
+            view1 = self.masker._extract_view(img_tensor, self.masker.view1_start)
+            view2 = self.masker._extract_view(img_tensor, self.masker.view2_start)
+
+            view1_out, *_ = convert_to_dst_type(view1, dst=img, dtype=view1.dtype)
+            view2_out, *_ = convert_to_dst_type(view2, dst=img, dtype=view2.dtype)
+
+            output[f"{key}_1"] = view1_out
+            output[f"{key}_2"] = view2_out
+
+            if mask1 is None:
+                mask1 = torch.from_numpy(
+                    self.masker._create_mask(
+                        self.masker.view1_start, self.masker.view2_start
+                    )
+                ).long()
+                mask2 = torch.from_numpy(
+                    self.masker._create_mask(
+                        self.masker.view2_start, self.masker.view1_start
+                    )
+                ).long()
+
         output["mask_1"] = mask1
         output["mask_2"] = mask2
 

@@ -8,6 +8,7 @@ from .dictionary import (
     RandomGaussianNoised,
     RandomHighPassSharpend,
     RandomMaskedViewsd,
+    RandomMaskedViewsd2,
 )
 from .array import (
     NumpyToTensor,
@@ -18,7 +19,9 @@ from .array import (
     RandomLowPassBlur,
     RandomGaussianNoise,
     RandomHighPassSharpen,
+    RandomMaskedViews2,
 )
 
 # Alias the dictionary version as RandomMaskedViews for convenience (to match module.py import)
 RandomMaskedViews = RandomMaskedViewsd
+RandomMaskedViews2 = RandomMaskedViewsd2

@@ -35,7 +35,7 @@ from cryosiam.data import MrcReader  # , TiffReader
 from cryosiam.utils import basic_train_val_split
 from cryosiam.networks.nets import DenseSimSiam
 from cryosiam.transforms import (
-    RandomMaskedViews,
+    RandomMaskedViewsd,
     RandomLowPassBlurd,
     RandomGaussianNoised,
     RandomHighPassSharpend,
@@ -271,7 +271,7 @@ class DenseSimSiamModule(pl.LightningModule):
                     keys=keys,
                     spatial_size=self.data_cfg.patch_size,
                 ),
-                RandomMaskedViews(
+                RandomMaskedViewsd(
                     keys=keys,
                     input_image_size=self.data_cfg.patch_size,
                     view_size=self.data_cfg.view_size,

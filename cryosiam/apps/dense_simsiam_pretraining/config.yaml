@@ -3,12 +3,11 @@ patches_folder: /scratch/talks/cryosiam_experiments/dense_simsiam_pretraining/pa
 logging:
   logger: "wandb"
   project: "dense_simsiam_pre-training"
-  name: "test_run1"
-  log_dir: /scratch/talks/cryosiam_experiments/dense_simsiam_pretraining
-#pretrained_model: '/g/zaugg/stojanov/simulated_datasets/experiments/dense_simsiam/version_1/model/last.ckpt'
+  name: model1
+  log_dir: /g/kreshuk/talks/cryosiam_results/dense_simsiam_pretraining/model1
 file_extension: '.mrc'
 
-train_files: ['sample_1_Vol.mrc', 'sample_2_Vol.mrc']
+train_files: null
 
 val_files: null
 validation_ratio: 0.5
@@ -23,34 +22,34 @@ parameters:
   data:
     patch_size: [ 128, 128, 128 ]
     patch_overlap: 0.5
-    view_size: [ 32, 32, 32 ]
+    view_size: [64, 64, 64]
     view_overlap: 0.5
     min: 0
     max: 1
     mean: 0
     std:  1
   transforms:
-    low_pass_sigma_range: null
-    high_pass_sigma_range: null
-    high_pass_sigma2_range: null
-    noise_sigma_range: null
-    combine_transforms: False
-    drop_out_prob: 0.0
-    drop_out: 0.0
+    low_pass_sigma_range: [0.5, 2]
+    high_pass_sigma_range: [0.1, 0.5]
+    high_pass_sigma2_range: [1,5]
+    noise_sigma_range: [0.1, 0.5]
+    combine_transforms: True
+    drop_out_prob: 0.5
+    drop_out: 0.5
     use_noisy_input: False
   network:
-    block_type: 'bottleneck'
+    block_type: 'basic'
     spatial_dims: 3
     in_channels: 1
     num_layers: [1,1,1,1]
     num_filters: [64, 128, 256, 512]
     fpn_channels: 128
     no_max_pool: True
-    dim: 2048
-    pred_dim: 512
-    dense_dim: 32
-    dense_pred_dim: 64
-    include_levels_loss: False
+    dim: 256
+    pred_dim: 64
+    dense_dim: 64
+    dense_pred_dim: 16
+    include_levels_loss: True
     add_fpn_later_conv: False
     decoder_type: "fpn"
     fpn_layers: 2
@@ -58,13 +57,13 @@ parameters:
     weight_dense_loss: null
 
 hyper_parameters:
-  batch_size: 2
-  lr: 0.001
+  batch_size: 10
+  lr: 0.5
   momentum: 0.9
   weight_decay: 0.00001
   fix_pred_lr: False
-  max_epochs: 2
-  lr_warmup_epochs: null
-  val_interval: 1
+  max_epochs: 200
+  lr_warmup_epochs: 5
+  val_interval: 10
   cache_rate: 0
   replace_rate: null

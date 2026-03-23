@@ -3,8 +3,8 @@
 #SBATCH -A kreshuk                              # specify the group
 #SBATCH --job-name=model1                         # specify the name of the job
 #SBATCH -N 1				                    # specify the number of cluster nodes for the job
-#SBATCH -n 8				                    # specify the number of cores per node for the job
-#SBATCH --mem 30G			                    # specify the amount of memory per node
+#SBATCH --ntasks-per-node=8				                    # specify the number of cores per node for the job
+#SBATCH --mem 20G			                    # specify the amount of memory per node
 #SBATCH -t 1-00:00:00                           # specify the runtime of the job IMPORTANT: your job will get killed if it exceeds this runtime (the format is d-h:mm-ss)
 #SBATCH -o ../SLURM/model1/outfile.out		    # specify the file to write the command line output to
 #SBATCH -e ../SLURM/model1/errfile.err			# specify the file to write the error output to

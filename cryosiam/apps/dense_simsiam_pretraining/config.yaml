@@ -1,5 +1,5 @@
 data_folder: /scratch/talks/data/cryoetsim_data/combined_clean_inverted_scaled
-patches_folder: /scratch/talks/cryosiam_experiments/dense_simsiam_pretraining/patches_0
+patches_folder: /scratch/talks/cryosiam_experiments/dense_simsiam_pretraining/patches_full_Vol
 logging:
   logger: "wandb"
   project: "dense_simsiam_pre-training"
@@ -10,7 +10,7 @@ file_extension: '.mrc'
 train_files: null
 
 val_files: null
-validation_ratio: 0.5
+validation_ratio: 0.1
 noisy_data_folder: null
 noisy_patches_folder: null
 
